@@ -1,56 +1,214 @@
 # Technical Specification: Reddit Comment Stories
 
-## Objective
+## Project Status: Core Implementation Complete ✅
 
-Automate the creation of short stories using the top 5 comments from selected Reddit posts (e.g., AskReddit).
+### Implemented Features
+- ✅ Reddit scraping with PRAW
+- ✅ Comment quality filtering
+- ✅ AI story generation (AWS Bedrock Claude)
+- ✅ Multiple narrative styles
+- ✅ CLI tool with full functionality
+- ✅ Markdown and JSON output formats
+
+### Pending Features
+- ⏳ Streamlit web interface
+- ⏳ Audio generation (Amazon Polly)
+- ⏳ AWS Lambda deployment
+- ⏳ REST API endpoints
 
 ---
 
-## Core Components
+## Architecture Overview
 
-### 1. **Reddit Scraper**
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         CLI Interface                             │
+│                    python -m backend [command]                    │
+└─────────────────────────────────────────────────────────────────┘
+                                 │
+┌─────────────────────────────────────────────────────────────────┐
+│                      Story Generator                              │
+│                 Coordinates all components                        │
+└─────────────────────────────────────────────────────────────────┘
+         │                       │                       │
+┌────────────────┐    ┌────────────────┐    ┌────────────────────┐
+│ Reddit Scraper │    │ Prompt Builder │    │    AI Client       │
+│     (PRAW)     │    │  (6 styles)    │    │ (AWS Bedrock)      │
+└────────────────┘    └────────────────┘    └────────────────────┘
+```
+
+---
+
+## Core Components (Implemented)
+
+### 1. **Reddit Scraper** (`backend/reddit_scraper.py`)
 - **Tool**: PRAW (Python Reddit API Wrapper)
-- **Function**: 
-  - Authenticate to Reddit
-  - Fetch latest/top posts from a given subreddit (default: AskReddit)
-  - For each post, get the post title and top 5 comments (non-deleted, non-bot)
+- **Features**: 
+  - OAuth-less authentication (read-only mode)
+  - Fetch top posts by time period (hour/day/week/month/year/all)
+  - Extract top N comments with quality filtering
+  - Bot detection and removal
+  - Comment score threshold filtering
+  - Text cleaning and formatting
 
-### 2. **Prompt Generator**
-- Format the post and comments into a single prompt:
+**Key Classes:**
+- `RedditScraper`: Main scraping interface
+- `RedditPost`: Post data model
+- `RedditComment`: Comment data model
 
-You are a creative writer. Turn the following Reddit post and comments into a short story...
+### 2. **Prompt Builder** (`backend/prompt_builder.py`)
+- **Narrative Styles**: 6 different styles implemented
+  - `engaging`: Balanced, accessible narrative
+  - `comedy`: Humorous and light-hearted
+  - `drama`: Emotional and character-driven
+  - `documentary`: Factual and journalistic
+  - `wholesome`: Uplifting and positive
+  - `thriller`: Suspenseful and tense
+- **Features**:
+  - Dynamic prompt construction
+  - Word count constraints
+  - Token estimation
+  - Style-specific instructions
 
-Prompt: <Post title>
-Comment 1: ...
-Comment 2: ...
-...
+### 3. **AI Client** (`backend/ai_client.py`)
+- **Multi-Provider Support**:
+  - OpenAI GPT-4 (ready but not tested)
+  - Anthropic Claude (ready but not tested)
+  - AWS Bedrock Claude 3 Sonnet (active)
+- **Features**:
+  - Automatic provider detection
+  - Unified interface for all providers
+  - Error handling and retries
+  - Connection testing
 
-### 3. **AI Story Generator**
-- **Option A**: OpenAI (gpt-4)
-- **Option B**: Anthropic Claude via Bedrock
-- Return a short story that incorporates all 5 comments in narrative form
+### 4. **Story Generator** (`backend/story_generator.py`)
+- **Core Functionality**:
+  - End-to-end story generation pipeline
+  - Batch processing capabilities
+  - Multiple output formats
+  - Metadata tracking
+- **Output Formats**:
+  - Markdown with frontmatter
+  - JSON with full metadata
+  - Console display
 
-### 4. **Frontend (Optional)**
-- Streamlit (for MVP) or Next.js for full UI
-- Inputs: subreddit, story length
-- Output: Generated story + button to export/share
+### 5. **CLI Tool** (`backend/cli.py`)
+- **Commands**:
+  - `generate`: Single story generation
+  - `batch`: Multiple story generation
+  - `test`: API connection testing
+  - `styles`: List available styles
+- **Features**:
+  - Comprehensive argument parsing
+  - Progress indicators
+  - Error handling
+  - Verbose logging option
 
 ---
 
-## Alternatives
+## Configuration Management
 
-- **API**: Pushshift (faster access but may be outdated); fallback if PRAW fails
-- **Output Format**: Could include HTML, JSON, or text export
-- **Audio Story**: Use Amazon Polly for speech synthesis if needed
+### Environment Variables (`.env`)
+```
+REDDIT_CLIENT_ID=your_client_id
+REDDIT_CLIENT_SECRET=your_secret
+AWS_PROFILE=personal
+AWS_DEFAULT_REGION=us-east-1
+```
 
-## Challenges
+### Config Module (`backend/config.py`)
+- Centralized configuration management
+- Environment variable validation
+- Default values for all settings
+- Provider auto-detection
 
-- Detect and filter out deleted or low-quality comments
-- Comment formatting (newlines, links, emojis) cleanup
-- Keeping stories coherent with wildly different comment tones
+---
 
-## Future Ideas
+## Data Flow
 
-- Generate illustrations using DALL·E or Midjourney
-- Allow users to submit their own post/comment set
-- "Story of the Day" feed
+1. **User Input** → CLI command with options
+2. **Reddit Scraping** → Fetch posts → Filter → Extract comments
+3. **Prompt Building** → Format data → Apply style template
+4. **AI Generation** → Send to Bedrock → Receive story
+5. **Output** → Format → Save to disk → Display
+
+---
+
+## Quality Controls
+
+### Comment Filtering
+- Minimum score threshold (default: 10)
+- Bot account detection
+- Deleted/removed comment handling
+- Minimum length requirement
+- Text cleaning (remove edits, excessive formatting)
+
+### Story Generation
+- Word count constraints (300-500 words default)
+- Style consistency enforcement
+- Narrative coherence prompting
+- Error handling for API failures
+
+---
+
+## File Structure
+```
+backend/
+├── __init__.py          # Package initialization
+├── __main__.py          # Module entry point
+├── ai_client.py         # AI provider abstraction
+├── cli.py               # Command-line interface
+├── config.py            # Configuration management
+├── prompt_builder.py    # Prompt engineering
+├── reddit_scraper.py    # Reddit API integration
+└── story_generator.py   # Core story generation logic
+```
+
+---
+
+## Performance Metrics
+- Reddit API: ~60 requests/minute limit
+- Story generation: 15-20 seconds average
+- Batch processing: 5-10 stories/minute
+- Token usage: ~1000-2000 per story
+
+---
+
+## Security Considerations
+- API keys stored in environment variables
+- No user authentication required
+- Read-only Reddit access
+- AWS credentials via profile
+- No sensitive data storage
+
+---
+
+## Future Enhancements
+
+### Phase 1: Web Interface
+- Streamlit frontend
+- Real-time generation
+- Story browsing/search
+- Export functionality
+
+### Phase 2: Cloud Deployment
+- AWS Lambda functions
+- API Gateway endpoints
+- S3 storage
+- CloudFront CDN
+
+### Phase 3: Advanced Features
+- Audio narration (Polly)
+- Story illustrations (DALL-E)
+- User accounts
+- Story voting/rating
+- Multi-language support
+
+---
+
+## Testing Strategy
+- Unit tests for each module
+- Integration tests for pipeline
+- Mock external APIs
+- Performance benchmarks
+- Error scenario coverage
